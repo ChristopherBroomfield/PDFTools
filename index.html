@@ -318,18 +318,36 @@ button, input { font: inherit; color: inherit; }
   .grip { display: none; }
   .cbtns { grid-column: 1 / -1; justify-content: flex-end; }
 }
+
+/* Convert view */
+.cthumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cthumb.txt {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 11px; color: #5b6b7a;
+}
+.opts { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 14px; align-items: flex-end; }
+.opt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.opt.grow { flex: 1 1 220px; max-width: 420px; }
+.opt label { font-weight: 500; font-size: 13px; }
+.opt select, .opt input {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 5px;
+  padding: 6px 8px; font-size: 14px; width: 100%;
+}
+.opt input { font-family: var(--font-mono); }
+.opt select:disabled { opacity: 0.5; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <h1>PDF Tools</h1>
-    <p class="privacy">Your PDFs are processed in this browser tab. Nothing is uploaded or stored.</p>
+    <p class="privacy">Your files are processed in this browser tab. Nothing is uploaded or stored.</p>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Tool">
     <button class="tab" id="tabSplit" type="button" role="tab" aria-selected="true">Split pages</button>
     <button class="tab" id="tabCombine" type="button" role="tab" aria-selected="false">Combine PDFs</button>
+    <button class="tab" id="tabConvert" type="button" role="tab" aria-selected="false">Convert to PDF</button>
   </nav>
 
   <div class="view" id="viewSplit">
@@ -441,6 +459,69 @@ button, input { font: inherit; color: inherit; }
         </div>
         <div class="status" id="cStatus" role="status"></div>
         <button class="btn primary" id="cGoBtn" type="button" disabled>Combine and download</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="viewConvert" hidden>
+    <section class="filebar" id="vDrop" aria-label="Add files">
+      <div class="fileinfo">
+        <div style="font-weight:500">Files to convert</div>
+        <div class="filemeta" id="vMeta">&nbsp;</div>
+      </div>
+      <span class="drophint">Drop images or text files anywhere on this page, or</span>
+      <label class="btn" for="vInput" id="vChoose" tabindex="0" role="button">Add files…</label>
+      <input class="visually-hidden" type="file" id="vInput" accept="image/*,.txt,text/plain" multiple tabindex="-1">
+    </section>
+
+    <section class="panel" aria-label="Files and options">
+      <div class="gridhead">
+        <h2>Order</h2>
+        <div class="selbtns">
+          <button class="btn small" id="vSort" type="button">Sort A to Z</button>
+          <button class="btn small" id="vClear" type="button">Remove all</button>
+        </div>
+      </div>
+      <ol class="clist" id="vList"></ol>
+      <p class="tip">Converts JPG, PNG, WebP, GIF and BMP images (one page each) and plain text files. Drag a row or use the arrows to reorder.</p>
+      <div class="opts">
+        <div class="opt">
+          <label for="vSize">Page size</label>
+          <select id="vSize">
+            <option value="a4" selected>A4, image fitted to the page</option>
+            <option value="image">Same size as each image</option>
+          </select>
+        </div>
+        <div class="opt">
+          <label for="vMargin">Image margin</label>
+          <select id="vMargin">
+            <option value="0">None</option>
+            <option value="28.35" selected>10 mm</option>
+            <option value="56.69">20 mm</option>
+          </select>
+        </div>
+        <div class="opt">
+          <label for="vOut">Output</label>
+          <select id="vOut">
+            <option value="one" selected>One combined PDF</option>
+            <option value="each">A separate PDF for each file</option>
+          </select>
+        </div>
+        <div class="opt grow">
+          <label for="vName">Save as</label>
+          <input type="text" id="vName" value="converted.pdf" spellcheck="false" autocomplete="off">
+        </div>
+      </div>
+    </section>
+
+    <div class="actionbar">
+      <div class="inner">
+        <div class="summary" aria-live="polite">
+          <div class="line" id="vSumLine">&nbsp;</div>
+          <div class="files" id="vSumFiles"></div>
+        </div>
+        <div class="status" id="vStatus" role="status"></div>
+        <button class="btn primary" id="vGoBtn" type="button" disabled>Convert and download</button>
       </div>
     </div>
   </div>
@@ -889,15 +970,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   /* ---------- tabs ---------- */
   var view = "split";
   function show(v) {
-    view = v === "combine" ? "combine" : "split";
-    $("viewSplit").hidden = view !== "split";
-    $("viewCombine").hidden = view !== "combine";
-    $("tabSplit").setAttribute("aria-selected", view === "split" ? "true" : "false");
-    $("tabCombine").setAttribute("aria-selected", view === "combine" ? "true" : "false");
+    view = v === "combine" || v === "convert" ? v : "split";
+    [["split", "viewSplit", "tabSplit"], ["combine", "viewCombine", "tabCombine"], ["convert", "viewConvert", "tabConvert"]].forEach(function (t) {
+      $(t[1]).hidden = view !== t[0];
+      $(t[2]).setAttribute("aria-selected", view === t[0] ? "true" : "false");
+    });
   }
   function go(v) { show(v); try { location.hash = v; } catch (e) {} }
   $("tabSplit").onclick = function () { go("split"); };
   $("tabCombine").onclick = function () { go("combine"); };
+  $("tabConvert").onclick = function () { go("convert"); };
+  function dropZone() { return $(view === "combine" ? "cDrop" : view === "convert" ? "vDrop" : "filebar"); }
   window.addEventListener("hashchange", function () { show(location.hash.slice(1)); });
   show(location.hash.slice(1));
 
@@ -907,11 +990,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var t = ev.dataTransfer && ev.dataTransfer.types;
     return !!t && Array.prototype.indexOf.call(t, "Files") !== -1;
   }
-  function clearDrag() { depth = 0; $("filebar").classList.remove("drag"); $("cDrop").classList.remove("drag"); }
+  function clearDrag() { depth = 0; $("filebar").classList.remove("drag"); $("cDrop").classList.remove("drag"); $("vDrop").classList.remove("drag"); }
   window.addEventListener("dragenter", function (ev) {
     if (!hasFiles(ev)) return;
     ev.preventDefault(); depth++;
-    (view === "combine" ? $("cDrop") : $("filebar")).classList.add("drag");
+    dropZone().classList.add("drag");
   });
   window.addEventListener("dragover", function (ev) { if (hasFiles(ev)) ev.preventDefault(); });
   window.addEventListener("dragleave", function (ev) {
@@ -923,7 +1006,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     ev.preventDefault(); clearDrag();
     var files = ev.dataTransfer.files;
     if (!files.length) return;
-    if (view === "combine") addFiles(files); else takeFile(files[0]);
+    if (view === "combine") addFiles(files); else if (view === "convert") addConvFiles(files); else takeFile(files[0]);
   });
 
   /* ---------- combine ---------- */
@@ -1140,6 +1223,341 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     C.busy = false; refreshCombine();
   });
 
+  /* ---------- convert to PDF ---------- */
+  var V = { items: [], busy: false, seq: 0, dragId: null };
+  var IMG_EXT = /\.(jpe?g|png|webp|gif|bmp)$/i, TXT_EXT = /\.(txt|text|log)$/i;
+
+  function setVStatus(msg, bad) {
+    var el = $("vStatus");
+    el.textContent = msg || "";
+    el.classList.toggle("bad", !!bad);
+  }
+  function stem(name) { return (name.replace(/\.[^.\\/]+$/, "").replace(/[\\/:*?"<>|]+/g, "_").trim()) || "file"; }
+  function vOutName() {
+    var v = $("vName").value.trim().replace(/[\\/:*?"<>|]+/g, "_");
+    if (!v) v = "converted";
+    if (!/\.pdf$/i.test(v)) v += ".pdf";
+    return v;
+  }
+  function loadImg(url) {
+    return new Promise(function (resolve, reject) {
+      var im = new Image();
+      im.onload = function () { resolve(im); };
+      im.onerror = function () { reject(new Error("unreadable image")); };
+      im.src = url;
+    });
+  }
+
+  async function addConvItem(file, name, sample) {
+    var type = file.type || "";
+    var isJpg = type === "image/jpeg" || /\.jpe?g$/i.test(name);
+    var isPng = type === "image/png" || /\.png$/i.test(name);
+    var isImg = isJpg || isPng || IMG_EXT.test(name) || /^image\/(webp|gif|bmp)$/.test(type);
+    var isTxt = !isImg && (type === "text/plain" || TXT_EXT.test(name));
+    if (!isImg && !isTxt) {
+      if (/\.(docx?|xlsx?|pptx?|msg|eml|rtf|odt)$/i.test(name)) return "Office and email files are not supported";
+      if (/\.pdf$/i.test(name)) return "already a PDF";
+      if (/\.(tiff?|heic|heif)$/i.test(name)) return "this image format is not supported by browsers";
+      return "unsupported file type";
+    }
+    var it = { id: ++V.seq, name: name, size: file.size, file: file, sample: !!sample,
+               kind: isTxt ? "text" : isJpg ? "jpg" : isPng ? "png" : "other", url: null, w: 0, h: 0 };
+    if (isImg) {
+      it.url = URL.createObjectURL(file);
+      try { var im = await loadImg(it.url); it.w = im.naturalWidth; it.h = im.naturalHeight; }
+      catch (e) { URL.revokeObjectURL(it.url); return "not a readable image"; }
+      if (!it.w || !it.h) { URL.revokeObjectURL(it.url); return "not a readable image"; }
+    }
+    V.items.push(it);
+    return "";
+  }
+
+  async function addConvFiles(list) {
+    var files = Array.prototype.slice.call(list || []);
+    if (!files.length) return;
+    setVStatus("Reading " + files.length + (files.length === 1 ? " file…" : " files…"));
+    var skipped = [], added = 0;
+    var hadSample = V.items.some(function (i) { return i.sample; });
+    for (var i = 0; i < files.length; i++) {
+      var err = await addConvItem(files[i], files[i].name, false);
+      if (err) skipped.push(files[i].name + " (" + err + ")"); else added++;
+    }
+    if (added && hadSample) dropConv(function (i) { return i.sample; });
+    renderConv();
+    setVStatus(skipped.length ? "Skipped " + skipped.join(", ") + "." : "", skipped.length > 0);
+  }
+  function dropConv(test) {
+    V.items = V.items.filter(function (i) {
+      if (test(i)) { if (i.url) URL.revokeObjectURL(i.url); return false; }
+      return true;
+    });
+  }
+
+  function renderConv() {
+    var list = $("vList"), k = V.items.length;
+    list.textContent = "";
+    if (!k) list.appendChild(mk("li", "cempty", "No files added yet. Drop some here or choose Add files."));
+    V.items.forEach(function (it, i) {
+      var li = mk("li", "crow");
+      li.dataset.id = it.id; li.draggable = true;
+      var grip = mk("span", "grip", "⠿"); grip.setAttribute("aria-hidden", "true");
+      var thumb = mk("div", "cthumb" + (it.kind === "text" ? " txt" : ""));
+      if (it.kind === "text") thumb.textContent = "TXT";
+      else { var im = document.createElement("img"); im.src = it.url; im.alt = ""; im.draggable = false; thumb.appendChild(im); }
+      var info = mk("div", "cinfo");
+      var nameRow = mk("div");
+      if (it.sample) nameRow.appendChild(mk("span", "tag", "Example"));
+      nameRow.appendChild(mk("span", "filename", it.name));
+      info.appendChild(nameRow);
+      info.appendChild(mk("div", "filemeta", (it.kind === "text" ? "Plain text" : "Image · " + it.w + " × " + it.h + " px") + " · " + fmtSize(it.size)));
+      var btns = mk("div", "cbtns");
+      btns.appendChild(actBtn("up", "Move " + it.name + " up", "↑", i === 0));
+      btns.appendChild(actBtn("down", "Move " + it.name + " down", "↓", i === k - 1));
+      btns.appendChild(actBtn("remove", "Remove " + it.name, "✕", false));
+      li.appendChild(grip); li.appendChild(mk("span", "cnum", String(i + 1)));
+      li.appendChild(thumb); li.appendChild(info); li.appendChild(btns);
+      list.appendChild(li);
+    });
+    $("vMeta").textContent = k ? k + (k === 1 ? " file" : " files") : "None added";
+    refreshConv();
+  }
+
+  function convPlan() {
+    var k = V.items.length, each = $("vOut").value === "each";
+    if (!each || k === 1) return { names: [each ? stem(V.items[0].name) + ".pdf" : vOutName()], zip: null };
+    var seen = {}, names = V.items.map(function (it) {
+      var s = stem(it.name), key = s.toLowerCase();
+      seen[key] = (seen[key] || 0) + 1;
+      return (seen[key] > 1 ? s + "_" + seen[key] : s) + ".pdf";
+    });
+    return { names: names, zip: stem(vOutName()) + ".zip" };
+  }
+
+  function refreshConv() {
+    var k = V.items.length, btn = $("vGoBtn");
+    $("vMargin").disabled = $("vSize").value === "image";
+    $("vName").disabled = $("vOut").value === "each" && k === 1;
+    if (!k) {
+      $("vSumLine").textContent = "Add images or text files to convert.";
+      $("vSumFiles").textContent = ""; btn.disabled = true; btn.textContent = "Convert and download";
+      return;
+    }
+    var p = convPlan();
+    $("vSumLine").textContent = p.zip
+      ? "Converts " + k + " files into " + k + " PDFs, delivered as one ZIP"
+      : "Converts " + k + (k === 1 ? " file" : " files") + " into one PDF";
+    $("vSumFiles").textContent = (p.zip || p.names[0]) + (V.items.some(function (i) { return i.sample; }) ? "  —  Examples shown. Add your own files to replace them." : "");
+    btn.disabled = V.busy;
+    btn.textContent = p.zip ? "Convert and download ZIP" : "Convert and download PDF";
+  }
+
+  /* JPEG EXIF orientation: 1 = upright. Anything else is redrawn upright before embedding. */
+  function exifOrientation(b) {
+    try {
+      if (b[0] !== 0xFF || b[1] !== 0xD8) return 1;
+      var dv = new DataView(b.buffer, b.byteOffset, b.byteLength), p = 2;
+      while (p + 4 < b.length) {
+        if (b[p] !== 0xFF) return 1;
+        var marker = b[p + 1], len = dv.getUint16(p + 2);
+        if (marker === 0xE1 && dv.getUint32(p + 4) === 0x45786966) {
+          var t = p + 10, le = dv.getUint16(t) === 0x4949;
+          var ifd = t + dv.getUint32(t + 4, le), n = dv.getUint16(ifd, le);
+          for (var i = 0; i < n; i++) {
+            var e = ifd + 2 + i * 12;
+            if (dv.getUint16(e, le) === 0x0112) return dv.getUint16(e + 8, le);
+          }
+          return 1;
+        }
+        if (marker === 0xDA) return 1;
+        p += 2 + len;
+      }
+    } catch (e) {}
+    return 1;
+  }
+
+  async function embedImage(doc, it) {
+    var bytes = new Uint8Array(await it.file.arrayBuffer());
+    // Embed the original bytes where possible so nothing is recompressed.
+    if (it.kind === "jpg" && exifOrientation(bytes) <= 1) { try { return await doc.embedJpg(bytes); } catch (e) {} }
+    if (it.kind === "png") { try { return await doc.embedPng(bytes); } catch (e) {} }
+    var im = await loadImg(it.url);
+    var c = document.createElement("canvas");
+    c.width = im.naturalWidth; c.height = im.naturalHeight;
+    var ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(im, 0, 0);
+    var asJpg = it.kind === "jpg";
+    var blob = await new Promise(function (r) { c.toBlob(r, asJpg ? "image/jpeg" : "image/png", 0.92); });
+    if (!blob) throw new Error("could not read " + it.name);
+    var out = new Uint8Array(await blob.arrayBuffer());
+    return asJpg ? doc.embedJpg(out) : doc.embedPng(out);
+  }
+
+  function addImagePage(doc, img, opt) {
+    var iw = img.width, ih = img.height;
+    if (opt.size === "image") {
+      var w0 = iw * 0.75, h0 = ih * 0.75;   // 96 px per inch
+      doc.addPage([w0, h0]).drawImage(img, { x: 0, y: 0, width: w0, height: h0 });
+      return;
+    }
+    var land = iw > ih, pw = land ? 841.89 : 595.28, ph = land ? 595.28 : 841.89, m = opt.margin;
+    var s = Math.min((pw - 2 * m) / iw, (ph - 2 * m) / ih), w = iw * s, h = ih * s;
+    doc.addPage([pw, ph]).drawImage(img, { x: (pw - w) / 2, y: (ph - h) / 2, width: w, height: h });
+  }
+
+  async function addTextPages(doc, it) {
+    var font = await doc.embedFont(PDFLib.StandardFonts.Courier);
+    var size = 10, lead = 13, m = 56.69, pw = 595.28, ph = 841.89;
+    var perLine = Math.floor((pw - 2 * m) / font.widthOfTextAtSize("M", size));
+    var okCache = {};
+    function ok(ch) {
+      if (okCache[ch] === undefined) { try { font.encodeText(ch); okCache[ch] = true; } catch (e) { okCache[ch] = false; } }
+      return okCache[ch];
+    }
+    var raw = (await it.file.text()).replace(/^﻿/, "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ");
+    var lines = [];
+    raw.split("\n").forEach(function (line) {
+      var clean = "";
+      for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (ch.charCodeAt(0) < 32) continue;
+        clean += ok(ch) ? ch : "?";
+      }
+      while (clean.length > perLine) {
+        var cut = clean.lastIndexOf(" ", perLine);
+        if (cut < perLine / 2) cut = perLine;
+        lines.push(clean.slice(0, cut));
+        clean = clean.slice(cut).replace(/^ /, "");
+      }
+      lines.push(clean);
+    });
+    var perPage = Math.floor((ph - 2 * m) / lead), page = null;
+    for (var n = 0; n < lines.length; n++) {
+      if (n % perPage === 0) page = doc.addPage([pw, ph]);
+      if (lines[n]) page.drawText(lines[n], { x: m, y: ph - m - size - (n % perPage) * lead, size: size, font: font, color: PDFLib.rgb(0, 0, 0) });
+    }
+    if (!lines.length) doc.addPage([pw, ph]);
+  }
+
+  async function addToDoc(doc, it, opt) {
+    if (it.kind === "text") await addTextPages(doc, it);
+    else addImagePage(doc, await embedImage(doc, it), opt);
+  }
+
+  $("vGoBtn").addEventListener("click", async function () {
+    if (V.busy || !V.items.length) return;
+    V.busy = true; refreshConv();
+    var items = V.items.slice(), p = convPlan();
+    var opt = { size: $("vSize").value, margin: Number($("vMargin").value) || 0 };
+    try {
+      var blob, outName;
+      if (p.zip) {
+        var zip = new JSZip();
+        for (var i = 0; i < items.length; i++) {
+          setVStatus("Converting " + (i + 1) + " of " + items.length + "…");
+          var d = await PDFLib.PDFDocument.create();
+          await addToDoc(d, items[i], opt);
+          zip.file(p.names[i], await d.save());
+          await new Promise(function (r) { setTimeout(r, 0); });
+        }
+        setVStatus("Packing ZIP…");
+        blob = await zip.generateAsync({ type: "blob" }); outName = p.zip;
+      } else {
+        var doc = await PDFLib.PDFDocument.create();
+        for (var j = 0; j < items.length; j++) {
+          setVStatus("Converting " + (j + 1) + " of " + items.length + "…");
+          await addToDoc(doc, items[j], opt);
+          await new Promise(function (r) { setTimeout(r, 0); });
+        }
+        setVStatus("Building PDF…");
+        blob = new Blob([await doc.save()], { type: "application/pdf" }); outName = p.names[0];
+      }
+      setVStatus("Confirm the download…");
+      await saveFile(outName, blob);
+      setVStatus("Saved " + outName + " (" + fmtSize(blob.size) + ").");
+    } catch (e) {
+      var code = e && e.code;
+      if (code === "declined") setVStatus("Download cancelled.");
+      else if (code === "rate_limited") setVStatus("A download prompt is already open. Answer it, then try again.", true);
+      else if (code) setVStatus("Saving files is not available in this view. Open the tool in its own tab on claude.ai and try again.", true);
+      else setVStatus("Converting failed: " + (e && e.message ? e.message : "unknown error") + ".", true);
+    }
+    V.busy = false; refreshConv();
+  });
+
+  /* list actions and drag-to-reorder for the convert list */
+  function vIndex(id) { for (var i = 0; i < V.items.length; i++) if (V.items[i].id === id) return i; return -1; }
+  $("vList").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button[data-act]");
+    if (!b) return;
+    var i = vIndex(Number(b.closest(".crow").dataset.id));
+    if (i < 0) return;
+    var act = b.dataset.act, it = V.items[i];
+    if (act === "remove") dropConv(function (x) { return x === it; });
+    else {
+      var j = act === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= V.items.length) return;
+      V.items.splice(i, 1); V.items.splice(j, 0, it);
+    }
+    renderConv();
+    if (act !== "remove") {
+      var again = document.querySelector('#vList .crow[data-id="' + it.id + '"] button[data-act="' + act + '"]');
+      if (again && !again.disabled) again.focus();
+    }
+  });
+  $("vList").addEventListener("dragstart", function (ev) {
+    var row = ev.target.closest && ev.target.closest(".crow");
+    if (!row) return;
+    V.dragId = Number(row.dataset.id);
+    try { ev.dataTransfer.setData("text/plain", String(V.dragId)); ev.dataTransfer.effectAllowed = "move"; } catch (e) {}
+    row.classList.add("dragging");
+  });
+  $("vList").addEventListener("dragover", function (ev) {
+    if (V.dragId == null) return;
+    ev.preventDefault();
+    var row = ev.target.closest(".crow"), rows = $("vList").children;
+    for (var i = 0; i < rows.length; i++) rows[i].classList.remove("over-before", "over-after");
+    if (!row || Number(row.dataset.id) === V.dragId) return;
+    var r = row.getBoundingClientRect();
+    row.classList.add(ev.clientY < r.top + r.height / 2 ? "over-before" : "over-after");
+  });
+  $("vList").addEventListener("drop", function (ev) {
+    if (V.dragId == null) return;
+    ev.preventDefault();
+    var row = ev.target.closest(".crow");
+    if (row && Number(row.dataset.id) !== V.dragId) {
+      var r = row.getBoundingClientRect(), after = ev.clientY >= r.top + r.height / 2;
+      var it = V.items.splice(vIndex(V.dragId), 1)[0];
+      V.items.splice(vIndex(Number(row.dataset.id)) + (after ? 1 : 0), 0, it);
+    }
+    V.dragId = null; renderConv();
+  });
+  $("vList").addEventListener("dragend", function () { V.dragId = null; renderConv(); });
+
+  $("vSort").onclick = function () {
+    V.items.sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }); });
+    renderConv();
+  };
+  $("vClear").onclick = function () { dropConv(function () { return true; }); renderConv(); setVStatus(""); };
+  ["vSize", "vMargin", "vOut"].forEach(function (id) { $(id).addEventListener("change", refreshConv); });
+  $("vName").addEventListener("input", refreshConv);
+  $("vInput").addEventListener("change", function () { addConvFiles(this.files); this.value = ""; });
+  $("vChoose").addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); $("vInput").click(); }
+  });
+
+  /* example images so the tab opens in a working state */
+  function sampleImage(title, w, h, type) {
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var x = c.getContext("2d");
+    x.fillStyle = "#fbfaf6"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#0b6e6e"; x.font = "bold " + Math.round(w / 28) + "px sans-serif"; x.fillText("EXAMPLE SCAN", w * 0.09, h * 0.09);
+    x.fillStyle = "#17222d"; x.font = "bold " + Math.round(w / 14) + "px sans-serif"; x.fillText(title, w * 0.09, h * 0.17);
+    x.fillStyle = "#d3dae1";
+    for (var l = 0; l < 16; l++) x.fillRect(w * 0.09, h * 0.24 + l * h * 0.04, (l % 5 === 4 ? 0.5 : 0.82) * w, h * 0.012);
+    return new Promise(function (r) { c.toBlob(r, type, 0.9); });
+  }
+
   /* ---------- example document so the tool opens in a working state ---------- */
   async function makeSample(titles) {
     var doc = await PDFLib.PDFDocument.create();
@@ -1164,6 +1582,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     makeSample(["Index", "Client care letter", "Terms of business", "Office copy entries", "Property information form", "Completion statement"])
       .then(function (bytes) { return loadPdf(bytes, "example-bundle.pdf", true); });
     renderList();
+    renderConv();
+    Promise.all([sampleImage("Receipt", 900, 1270, "image/jpeg"), sampleImage("Site photo", 1200, 800, "image/png")]).then(async function (r) {
+      if (V.items.length || !r[0] || !r[1]) return;
+      await addConvItem(new File([r[0]], "example-receipt.jpg", { type: "image/jpeg" }), "example-receipt.jpg", true);
+      await addConvItem(new File([r[1]], "example-site-photo.png", { type: "image/png" }), "example-site-photo.png", true);
+      if (V.items.some(function (i) { return !i.sample; })) dropConv(function (i) { return i.sample; });
+      renderConv();
+    });
     Promise.all([makeSample(["Contract", "Schedule 1"]), makeSample(["Transfer deed", "Title plan", "Mortgage deed"])]).then(async function (r) {
       if (C.items.length) return;
       await addItem(r[0], "example-contract.pdf", true);
